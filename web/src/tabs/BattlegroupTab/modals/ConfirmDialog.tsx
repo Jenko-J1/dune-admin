@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertDialog, Button } from '@heroui/react'
 import type { ConfirmDialogProps } from './types'
 
-export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ action, onConfirm, onClose }) => {
+export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ action, targetLabel, onConfirm, onClose }) => {
   const { t } = useTranslation()
   return (
     <AlertDialog.Backdrop variant="blur" className="bg-linear-to-t from-(--background)/85 via-(--background)/40 to-transparent" isOpen={action !== null} onOpenChange={(v) => { if (!v) onClose() }}>
@@ -21,6 +21,13 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ action, onConfirm,
             <p className="text-sm text-muted">
               {action ? t(`battlegroup.actions.${action.cmd}Msg` as never) : ''}
             </p>
+            {targetLabel && (
+              <p className="mt-2 text-xs text-muted">
+                {t('battlegroup.confirm.target')}
+                {': '}
+                <span className="font-mono text-foreground">{targetLabel}</span>
+              </p>
+            )}
           </AlertDialog.Body>
           <AlertDialog.Footer>
             <Button slot="close" variant="ghost" onPress={onClose}>{t('common.cancel')}</Button>

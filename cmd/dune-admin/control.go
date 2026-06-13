@@ -74,6 +74,13 @@ type ServerRow struct {
 	// best-effort from `ps -o etimes=` (0 when unavailable, e.g. non-AMP planes).
 	Port       int `json:"port,omitempty"`
 	AgeSeconds int `json:"ageSeconds,omitempty"`
+	// Container is the per-map container name (docker fleet only). It is the
+	// stable, unique row key for autoscaled maps whose map/dimension/partition
+	// can collide, and the target for per-server lifecycle commands.
+	Container string `json:"container,omitempty"`
+	// Autoscaled marks a map managed by the dune-autoscaler (docker fleet only):
+	// a Stop will be undone by the autoscaler, so the UI flags these rows.
+	Autoscaled bool `json:"autoscaled,omitempty"`
 }
 
 type ProcessInfo struct {
@@ -96,10 +103,16 @@ func newControlPlane(name string, cfg appConfig) ControlPlane {
 	case "kubectl":
 		return &kubectlControl{namespace: cfg.ControlNamespace}
 	case "docker":
+		directorContainer := cfg.DockerDirector
+		if directorContainer == "" {
+			directorContainer = "dune-director"
+		}
 		return &dockerControl{
-			gameserver:  cfg.DockerGameserver,
-			brokerGame:  cfg.DockerBrokerGame,
-			brokerAdmin: cfg.DockerBrokerAdmin,
+			gameserver:        cfg.DockerGameserver,
+			brokerGame:        cfg.DockerBrokerGame,
+			brokerAdmin:       cfg.DockerBrokerAdmin,
+			directorURL:       cfg.DirectorURL,
+			directorContainer: directorContainer,
 		}
 	case "amp":
 		user := cfg.AmpUser

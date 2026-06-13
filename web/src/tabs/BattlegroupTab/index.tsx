@@ -9,7 +9,7 @@ import { ScheduledRestartsCard } from '../../components/ScheduledRestartsCard'
 import { useStatus } from '../../hooks/useStatus'
 import { usePermissions } from '../../hooks/usePermissions'
 
-import { ACTIONS, INIT_WARN_MS, type ActionDef, type DetailedStatus } from './types'
+import { ACTIONS, INIT_WARN_MS, type ActionDef, type DetailedStatus, type ServerRow } from './types'
 import { ServersTable } from './ServersTable'
 import {
   HealthCard, HealthChips, BgVmCard, ComponentHealthCard, GameReadyCard, WebInterfacesCard,
@@ -32,6 +32,9 @@ export const BattlegroupTab: React.FC = () => {
   const [cmdOutput, setCmdOutput] = React.useState<string | null>(null)
   const [cmdDone, setCmdDone] = React.useState(false)
   const [confirmCmd, setConfirmCmd] = React.useState<ActionDef | null>(null)
+  // confirmTarget is set alongside confirmCmd for a per-map (single container)
+  // command; null means the command targets the whole battlegroup.
+  const [confirmTarget, setConfirmTarget] = React.useState<ServerRow | null>(null)
   const [startedAt, setStartedAt] = React.useState<number | null>(null)
   const [lastBackupFile, setLastBackupFile] = React.useState<string | null>(null)
 
@@ -88,17 +91,24 @@ export const BattlegroupTab: React.FC = () => {
     }
   }, [startedAt])
 
-  const runCmd = async (action: ActionDef) => {
+  // runCmd executes a lifecycle command. When target is set the command goes to
+  // that single map container (docker fleet); otherwise it acts on the whole
+  // battlegroup. The post-start init warning and backup-link parsing only apply
+  // to whole-battlegroup commands.
+  const runCmd = async (action: ActionDef, target?: ServerRow | null) => {
     setConfirmCmd(null)
+    setConfirmTarget(null)
     setRunningCmd(action.cmd)
     setCmdOutput(null)
     setCmdDone(false)
     try {
-      const res = await api.battlegroup.exec(action.cmd)
+      const res = target?.container
+        ? await api.battlegroup.serverExec(target.container, action.cmd)
+        : await api.battlegroup.exec(action.cmd)
       setCmdOutput(res.output || t('battlegroup.noOutput'))
       setCmdDone(true)
-      if (action.cmd === 'start' || action.cmd === 'restart') setStartedAt(Date.now())
-      if (action.cmd === 'backup') {
+      if (!target && (action.cmd === 'start' || action.cmd === 'restart')) setStartedAt(Date.now())
+      if (!target && action.cmd === 'backup') {
         const match = (res.output || '').match(/database-dumps\/[^/]+\/([^\s]+\.backup)/)
         if (match) setLastBackupFile(match[1])
       }
@@ -111,6 +121,12 @@ export const BattlegroupTab: React.FC = () => {
       setCmdDone(true)
       toast.danger(t('battlegroup.cmdFailed', { label: t(`battlegroup.actions.${action.cmd}` as never), message: msg }))
     }
+  }
+
+  // onServerAction opens the confirm dialog for a per-map lifecycle command.
+  const onServerAction = (server: ServerRow, action: ActionDef) => {
+    setConfirmTarget(server)
+    setConfirmCmd(action)
   }
 
   const openRestore = () => {
@@ -176,6 +192,9 @@ export const BattlegroupTab: React.FC = () => {
                   servers={servers}
                   isInitializing={isInitializing}
                   emptyMessage={status ? t('battlegroup.noGameServers') : t('battlegroup.clickRefresh')}
+                  canControl={can('server:control')}
+                  busy={runningCmd !== null}
+                  onServerAction={onServerAction}
                 />
               )}
         </HealthCard>
@@ -358,8 +377,9 @@ export const BattlegroupTab: React.FC = () => {
       {/* ── Modals ───────────────────────────────────────────────────── */}
       <ConfirmDialog
         action={confirmCmd}
-        onConfirm={runCmd}
-        onClose={() => setConfirmCmd(null)}
+        targetLabel={confirmTarget ? `${confirmTarget.map} (${confirmTarget.container})` : undefined}
+        onConfirm={(a) => runCmd(a, confirmTarget)}
+        onClose={() => { setConfirmCmd(null); setConfirmTarget(null) }}
       />
       <CommandOutputModal
         runningCmd={runningCmd}

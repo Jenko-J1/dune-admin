@@ -254,6 +254,38 @@ func cmdFetchServerStats(ctx context.Context, pool *pgxpool.Pool) (serverStats, 
 	return s, nil
 }
 
+// cmdFetchOnlinePlayersByPartition returns partition_id → count of currently
+// online players. It is the best-effort fallback for the docker Battlegroup
+// table when the Battlegroup Director is unreachable. The count is keyed on
+// dune.actors.partition_id — NOT a.map — because dune.actors.map stores the
+// *upgraded* engine name (Survival_1 → HaggaBasin), so a map-name join always
+// misses. partition_id equals the director partitionId and the game process's
+// -PartitionIndex, the reliable join key throughout.
+func cmdFetchOnlinePlayersByPartition(ctx context.Context, pool *pgxpool.Pool) (map[int]int, error) {
+	if pool == nil {
+		return nil, fmt.Errorf("not connected")
+	}
+	rows, err := pool.Query(ctx, `
+		SELECT COALESCE(a.partition_id, 0) AS partition_id, COUNT(*) AS n
+		FROM dune.player_state ps
+		JOIN dune.actors a ON a.id = ps.player_pawn_id
+		WHERE ps.online_status = 'Online' AND ps.player_pawn_id IS NOT NULL
+		GROUP BY a.partition_id`)
+	if err != nil {
+		return nil, fmt.Errorf("online players by partition: %w", err)
+	}
+	defer rows.Close()
+	out := map[int]int{}
+	for rows.Next() {
+		var partition, n int
+		if err := rows.Scan(&partition, &n); err != nil {
+			return nil, fmt.Errorf("scan online-by-partition: %w", err)
+		}
+		out[partition] = n
+	}
+	return out, rows.Err()
+}
+
 // factionXP pairs a character's faction with its cumulative character XP, for
 // the per-faction average level (#130 ext).
 type factionXP struct {

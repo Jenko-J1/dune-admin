@@ -1,22 +1,41 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@heroui-pro/react'
+import { Button } from '@heroui/react'
 import { DataTable, Icon } from '../../dune-ui'
 import { phaseColor } from './helpers'
 import { formatUptime } from './uptime'
-import { getServerColumns, type ServerRow, type ServerSortKey, type ServersTableProps } from './types'
+import { getServerColumns, SERVER_ACTIONS, type ServerRow, type ServerSortKey, type ServersTableProps } from './types'
 
-export const ServersTable: React.FC<ServersTableProps> = ({ servers, isInitializing, emptyMessage }) => {
+// Lucide icon per per-map lifecycle command.
+const SERVER_ACTION_ICON: Record<string, string> = {
+  start: 'play',
+  restart: 'rotate-cw',
+  stop: 'square',
+}
+
+// actionDisabled reflects container state so a Start on a running map (or a Stop
+// on a stopped one) is greyed out; restart is always available while not busy.
+function actionDisabled(cmd: string, s: ServerRow, busy: boolean): boolean {
+  if (busy) return true
+  if (cmd === 'start') return s.ready
+  if (cmd === 'stop') return !s.ready
+  return false
+}
+
+export const ServersTable: React.FC<ServersTableProps> = ({ servers, isInitializing, emptyMessage, canControl, busy, onServerAction }) => {
   const { t } = useTranslation()
+  const withActions = !!canControl && !!onServerAction
   return (
     <DataTable<ServerRow, ServerSortKey>
       aria-label={t('nav.battlegroup')}
       className="min-h-0 max-h-full"
-      columns={getServerColumns(t)}
+      columns={getServerColumns(t, withActions)}
       rows={servers}
-      rowId={(s) => `${s.map}-${s.dimension}-${s.partition}`}
+      rowId={(s) => s.container ?? `${s.map}-${s.dimension}-${s.partition}`}
       initialSort={{ column: 'map', direction: 'ascending' }}
       sortValue={(r, k) => {
+        if (k === 'actions') return 0
         if (k === 'ready') return r.ready ? 1 : 0
         if (k === 'age') return r.ageSeconds ?? 0
         return r[k] as string | number
@@ -31,7 +50,19 @@ export const ServersTable: React.FC<ServersTableProps> = ({ servers, isInitializ
       renderCell={(s, key) => {
         switch (key) {
           case 'map':
-            return <span className="font-mono">{s.map}</span>
+            return (
+              <span className="flex items-center gap-1.5">
+                <span className="font-mono">{s.map}</span>
+                {s.autoscaled && (
+                  <span
+                    title={t('battlegroup.autoscaledTip')}
+                    className="rounded bg-warning/15 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning"
+                  >
+                    {t('battlegroup.autoscaled')}
+                  </span>
+                )}
+              </span>
+            )
           case 'phase':
             return (
               <span className="font-semibold" style={{ color: phaseColor(s.phase) }}>
@@ -66,6 +97,25 @@ export const ServersTable: React.FC<ServersTableProps> = ({ servers, isInitializ
           case 'dimension': return <span className="text-muted">{s.dimension}</span>
           case 'partition': return <span className="text-muted">{s.partition}</span>
           case 'age': return <span className="font-mono text-muted">{formatUptime(s.ageSeconds)}</span>
+          case 'actions':
+            if (!withActions || !s.container) return null
+            return (
+              <div className="flex items-center justify-end gap-1">
+                {SERVER_ACTIONS.map((action) => (
+                  <Button
+                    key={action.cmd}
+                    size="sm"
+                    variant={action.danger ? 'danger-soft' : 'ghost'}
+                    className="px-2 min-w-0"
+                    isDisabled={actionDisabled(action.cmd, s, !!busy)}
+                    aria-label={`${t(`battlegroup.actions.${action.cmd}` as never)} ${s.map}`}
+                    onPress={() => onServerAction?.(s, action)}
+                  >
+                    <Icon name={SERVER_ACTION_ICON[action.cmd]} />
+                  </Button>
+                ))}
+              </div>
+            )
         }
       }}
     />

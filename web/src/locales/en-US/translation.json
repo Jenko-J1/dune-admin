@@ -255,6 +255,8 @@
       "update": "Update",
       "updateMsg": "Run a server update? This takes the server offline briefly."
     },
+    "autoscaled": "auto",
+    "autoscaledTip": "Managed by the dune-autoscaler — a Stop may be undone.",
     "backupLoadFailed": "Could not load backup files",
     "bodyPlaceholder": "Body",
     "broadcastBtn": "Broadcast",
@@ -264,6 +266,7 @@
     "cmdCompleted": "{{label}} completed",
     "cmdFailed": "{{label}} failed: {{message}}",
     "columns": {
+      "actions": "Actions",
       "age": "Age",
       "dim": "Dim",
       "map": "Map",
@@ -275,7 +278,8 @@
     },
     "confirm": {
       "confirmPrefix": "Confirm",
-      "serverSuffix": "Server"
+      "serverSuffix": "Server",
+      "target": "Target"
     },
     "database": "Database",
     "durationLabel": "Duration (s)",
