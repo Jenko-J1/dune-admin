@@ -150,10 +150,19 @@ type partitionMeta struct {
 // error) when no director URL is configured; transport, status, and decode
 // failures are returned as errors so the caller can log them and continue.
 func (c *ampControl) fetchDirectorPartitions(ctx context.Context, exec Executor) (map[int]partitionMeta, error) {
-	if c.directorURL == "" {
+	return fetchDirectorPartitionsVia(ctx, exec, c.directorURL)
+}
+
+// fetchDirectorPartitionsVia queries a Battlegroup Director's /v0/battlegroup
+// endpoint over HTTP and returns a map of partitionId → metadata. It returns nil
+// (no error) when directorURL is empty; transport, status, and decode failures
+// are returned as errors so callers can log them and continue. Shared by the AMP
+// and docker control planes.
+func fetchDirectorPartitionsVia(ctx context.Context, exec Executor, directorURL string) (map[int]partitionMeta, error) {
+	if directorURL == "" {
 		return nil, nil
 	}
-	endpoint := strings.TrimRight(c.directorURL, "/") + "/v0/battlegroup"
+	endpoint := strings.TrimRight(directorURL, "/") + "/v0/battlegroup"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build director request: %w", err)

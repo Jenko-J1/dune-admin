@@ -11,6 +11,9 @@ export type CommandOutputModalProps = {
 
 export type ConfirmDialogProps = {
   action: ActionDef | null
+  /** Optional per-map target (e.g. "HaggaBasin (dune-server-survival-1)") shown
+   *  in the body when the command targets a single container. */
+  targetLabel?: string
   onConfirm: (a: ActionDef) => void
   onClose: () => void
 }

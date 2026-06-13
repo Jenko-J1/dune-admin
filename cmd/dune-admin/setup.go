@@ -341,6 +341,10 @@ func runDockerSetup(ask func(string, string) string, ok, fail func(string), cfg 
 	cfg.DockerGameserver = ask("Game server container name", "dune-gameserver")
 	cfg.DockerBrokerGame = ask("mq-game broker container name (optional)", "")
 	cfg.DockerBrokerAdmin = ask("mq-admin broker container name (optional)", "")
+	// Battlegroup Director container — queried for per-map player/queue/dimension
+	// data in the fleet status (Red-Blink's dune-server-* stack). Set director_url
+	// in config instead to reach a host-networked director by URL.
+	cfg.DockerDirector = ask("Battlegroup Director container name", "dune-director")
 	fmt.Println()
 
 	// Test docker access

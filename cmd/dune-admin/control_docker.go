@@ -13,27 +13,18 @@ type dockerControl struct {
 	gameserver  string // container name for the game server
 	brokerGame  string // container name for mq-game broker
 	brokerAdmin string // container name for mq-admin broker
+	// directorURL, when set, is the Battlegroup Director HTTP endpoint reached
+	// through the executor (e.g. http://127.0.0.1:11717 on a host-networked
+	// stack). When empty, GetStatus curls the director from inside
+	// directorContainer instead. Both feed per-partition player/queue/dimension.
+	directorURL       string
+	directorContainer string // director container name (default "dune-director")
 }
 
 func (c *dockerControl) Name() string { return "docker" }
 
-func (c *dockerControl) GetStatus(_ context.Context, exec Executor) (*BattlegroupStatus, error) {
-	if c.gameserver == "" {
-		return nil, errNotSupported("docker", "GetStatus (docker_gameserver not configured)")
-	}
-	out, err := exec.Exec(fmt.Sprintf(
-		"docker inspect --format '{{.State.Status}}' %s 2>&1", c.gameserver))
-	if err != nil {
-		return nil, fmt.Errorf("docker inspect: %w", err)
-	}
-	status := strings.TrimSpace(out)
-	return &BattlegroupStatus{
-		Name:    c.gameserver,
-		Title:   c.gameserver,
-		Phase:   status,
-		Servers: []ServerRow{},
-	}, nil
-}
+// GetStatus is implemented in control_docker_fleet.go — it discovers per-map
+// dune-server-* containers rather than reporting a single gameserver.
 
 func (c *dockerControl) ExecCommand(_ context.Context, exec Executor, cmd string) (string, error) {
 	if c.gameserver == "" {

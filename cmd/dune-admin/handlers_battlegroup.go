@@ -91,6 +91,80 @@ func handleBGExec(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"output": out})
 }
 
+// bgServerCmdAllowlist gates per-container lifecycle commands.
+var bgServerCmdAllowlist = map[string]bool{"start": true, "stop": true, "restart": true}
+
+// serverInStatus reports whether container is among the control plane's
+// currently-discovered server rows — defense-in-depth so the endpoint can only
+// act on containers it actually surfaces.
+func serverInStatus(status *BattlegroupStatus, container string) bool {
+	for _, s := range status.Servers {
+		if s.Container == container {
+			return true
+		}
+	}
+	return false
+}
+
+// @Summary Start/stop/restart an individual game-server container (docker fleet)
+// @Tags battlegroup
+// @Accept json
+// @Produce json
+// @Param body body object true "container (dune-server-*) and cmd (start|stop|restart)"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 501 {object} map[string]string
+// @Failure 503 {object} map[string]string
+// @Router /api/v1/battlegroup/servers/exec [post]
+func handleBGServerExec(w http.ResponseWriter, r *http.Request) {
+	if globalControl == nil {
+		jsonErr(w, fmt.Errorf("not connected"), 503)
+		return
+	}
+	lc, ok := globalControl.(ServerLifecycle)
+	if !ok {
+		jsonErr(w, fmt.Errorf("%s control plane does not support per-server commands", globalControl.Name()), http.StatusNotImplemented)
+		return
+	}
+	var req struct {
+		Container string `json:"container"`
+		Cmd       string `json:"cmd"`
+	}
+	if err := decode(r, &req); err != nil {
+		jsonErr(w, err, 400)
+		return
+	}
+	if !bgServerCmdAllowlist[req.Cmd] {
+		jsonErr(w, fmt.Errorf("unknown command %q", req.Cmd), 400)
+		return
+	}
+	if !isValidDockerServerName(req.Container) {
+		jsonErr(w, fmt.Errorf("invalid container %q", req.Container), 400)
+		return
+	}
+	if globalExecutor == nil {
+		jsonErr(w, fmt.Errorf("not connected"), 503)
+		return
+	}
+	// Only act on containers we actually surface in the Battlegroup table.
+	status, err := globalControl.GetStatus(r.Context(), globalExecutor)
+	if err != nil {
+		jsonErr(w, fmt.Errorf("list servers: %w", err), 500)
+		return
+	}
+	if !serverInStatus(status, req.Container) {
+		jsonErr(w, fmt.Errorf("unknown server container %q", req.Container), 404)
+		return
+	}
+	out, err := lc.ExecServerCommand(r.Context(), globalExecutor, req.Container, req.Cmd)
+	if err != nil {
+		jsonErr(w, fmt.Errorf("exec: %w — output: %s", err, out), 500)
+		return
+	}
+	jsonOK(w, map[string]string{"output": out})
+}
+
 // @Summary List battlegroup pods/processes and their namespace
 // @Tags battlegroup
 // @Produce json

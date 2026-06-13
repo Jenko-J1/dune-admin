@@ -124,6 +124,9 @@ type appConfig struct {
 	DockerBrokerGame  string `yaml:"docker_broker_game"  json:"docker_broker_game"`
 	DockerBrokerAdmin string `yaml:"docker_broker_admin" json:"docker_broker_admin"`
 	DockerDB          string `yaml:"docker_db"           json:"docker_db"`
+	// DockerDirector is the Battlegroup Director container queried for per-map
+	// player/queue/dimension data in the fleet status (default "dune-director").
+	DockerDirector string `yaml:"docker_director" json:"docker_director"`
 
 	// local-specific — configurable shell commands
 	CmdStart   string `yaml:"cmd_start"   json:"cmd_start"`

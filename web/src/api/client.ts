@@ -973,6 +973,7 @@ export const api = {
   battlegroup: {
     status: () => req<unknown>('GET', '/battlegroup/status'),
     exec: (cmd: string) => req<BGOutput>('POST', '/battlegroup/exec', { cmd }),
+    serverExec: (container: string, cmd: string) => req<BGOutput>('POST', '/battlegroup/servers/exec', { container, cmd }),
     pods: () => req<{ pods: string[], namespace: string }>('GET', '/battlegroup/pods'),
     backupFiles: () => req<BackupFile[]>('GET', '/battlegroup/backup-files'),
     backupDownloadUrl: (file: string) => `${apiBase}/battlegroup/backup-files/download?file=${encodeURIComponent(file)}`,
